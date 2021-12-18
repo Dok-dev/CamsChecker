@@ -129,11 +129,33 @@ def pingGood(host):
     else:
         return False
 
+def userInSystem(host):
+    errCount = 0
+    error = ''
+    for cred in secrets.winCredentials:
+        logOffInfo = runPowershell(
+            f'((Get-WmiObject -ComputerName "{host}" -Class Win32_ComputerSystem -Credential (New-Object System.Management.Automation.PSCredential ("{cred["user"]}", (ConvertTo-SecureString "{cred["password"]}" -AsPlainText -Force)))).UserName' + r'-split "\\")[1]'
+        )
+        if logOffInfo.returncode == 0:
+            if logOffInfo.stdout == b'':
+                print(f'{host} on is logged off.')
+                return [False, '']
+            else:
+                return [True, '']
+        else:
+            errCount += 1
+            error = logOffInfo.stderr
+    if errCount == len(secrets.winCredentials):
+        print(error)
+        return [True, error]
+    else:
+        return [True, '']
+
 
 # Если время суточного отчета выставояем тригер для его формирования
 if time.localtime(time.time()).tm_hour == 8:
     dailyReport = True
-    dailyEmail_body = ''
+    daily_email_body = ''
 else:
     dailyReport = False
 
@@ -187,11 +209,14 @@ for policeServer in secrets.servers:
                                     # Проверяем включен ли комп
                                     if pingGood(channel[3]):
                                         # Проверяем залогинен ли пользователь в систему
-                                        if runPowershell(f'((Get-WmiObject -ComputerName "{channel[3]}" ' + r'-Class Win32_ComputerSystem).UserName -split "\\")[1]') == '':
+                                        logon = (userInSystem(channel[3]))
+                                        if not logon[0]:
                                             print(f'{channel[3]} on {policeServer["name"]} is logged off.')
                                         else:
-                                            print(time.ctime(NewestFileTimeInChanel), ' ', FilesPath, '      ', round(FileSize / (1024 * 1024), 1), 'Мб')
+                                            if logon[1] != '':
+                                                email_body += f' - Ошибка при попытке проверки пользователя в системе на {channel[3]} ({policeServer["name"]}) - {logon[1]}'
                                             send_email(email_subject, email_body)
+                                            print(time.ctime(NewestFileTimeInChanel), ' ', FilesPath, '      ', round(FileSize / (1024 * 1024), 1), 'Мб')
                                     else:
                                         email_subject = f'{channel[3]} on {policeServer["name"]} is shutdown or inaccessible.'
                                         email_body = (f'Хост {channel[3]} канала {channel[1]} на {policeServer["name"]} был выключен или стал недоступен.' +
@@ -222,44 +247,31 @@ for policeServer in secrets.servers:
                                         # Проверяем включен ли комп
                                         if pingGood(channel[3]):
                                             # Проверяем залогинен ли пользователь в систему
-                                            errCount = 0
-                                            for cred in secrets.winCredentials:
-                                                logOffInfo = runPowershell(
-                                                    f'((Get-WmiObject -ComputerName "{channel[3]}" -Class Win32_ComputerSystem -Credential (New-Object System.Management.Automation.PSCredential ("{cred["user"]}", (ConvertTo-SecureString "{cred["password"]}" -AsPlainText -Force)))).UserName' + r'-split "\\")[1]'
-                                                )
-                                                if logOffInfo.returncode == 0:
-                                                    if logOffInfo.stdout == b'':
-                                                        print(f'{channel[3]} on {policeServer["name"]} is logged off.')
-                                                        dailyEmail_body += f'Канал {channel[1]}(хост {channel[3]}) на {policeServer["name"]} - не обновляется т.к. в системе нет пользователя.'
-                                                        userInSystem = False
-                                                    else:
-                                                        userInSystem = True
-                                                else:
-                                                    userInSystem = True
-                                                    errCount += 1
-                                                    Error = logOffInfo.stderr
-                                            if errCount == len(secrets.winCredentials):
-                                                print(Error)
-                                                dailyEmail_body += f'Ошибка при попытке проверки пользователя в системе на {channel[3]} ({policeServer["name"]}) - {Error}'
-
+                                            logon = (userInSystem(channel[3]))
+                                            if logon[1] != '':
+                                                daily_email_body += f'Ошибка при попытке проверки пользователя в системе на {channel[3]} ({policeServer["name"]}) - {logon[1]}'
                                             else:
-                                                dailyEmail_body += f'{channel[1]} на {policeServer["name"]} - не обновляется.'
+                                                if not logon[0]:
+                                                    print(f'{channel[3]} on {policeServer["name"]} is logged off.')
+                                                    daily_email_body += f'Канал {channel[1]}(хост {channel[3]}) на {policeServer["name"]} - не обновляется т.к. в системе нет пользователя.'
+                                                else:
+                                                    daily_email_body += f'{channel[1]} на {policeServer["name"]} - не обновляется.'
                                         else:
-                                            email_body += f'Хост {channel[3]} канала {channel[1]} на {policeServer["name"]} выключен или недоступен.'
+                                            daily_email_body += f'Хост {channel[3]} канала {channel[1]} на {policeServer["name"]} выключен или недоступен.'
                                     else:
-                                        dailyEmail_body += f'{channel[1]} на {policeServer["name"]} - не обновляется.'
+                                        daily_email_body += f'{channel[1]} на {policeServer["name"]} - не обновляется.'
 
-                                    dailyEmail_body += (' | время последнего изменения по метке: ' +
-                                                        time.ctime(NewestFileTimeInChanel) + ' | текущий размер файла: ' +
-                                                        str(round(FileSize / (1024 * 1024), 2)) + 'Мб\n\n')
+                                    daily_email_body += (' | время последнего изменения по метке: ' +
+                                                         time.ctime(NewestFileTimeInChanel) + ' | текущий размер файла: ' +
+                                                         str(round(FileSize / (1024 * 1024), 2)) + 'Мб\n\n')
                             # если больше суток то
                             elif 2678400 > (int(time.time()) - NewestFileTimeInChanel) >= 86400:
                                 print(time.ctime(NewestFileTimeInChanel), ' ', FilesPath, '  ', 'не пишется более суток')
-                                dailyEmail_body += (f'{channel[1]} на {policeServer["name"]} - не пишется более суток.' +
+                                daily_email_body += (f'{channel[1]} на {policeServer["name"]} - не пишется более суток.' +
                                                     ' | время последнего изменения: ' + time.ctime(NewestFileTimeInChanel) +
                                                     ' - таймаут до забытия ' + str(round(30 - (int(time.time()) - NewestFileTimeInChanel) / 86400)) + 'дн.\n\n')
                         else:
-                            dailyEmail_body += (
+                            daily_email_body += (
                                     f'{channel[1]} на {policeServer["name"]} - ошибка открытия -' + NewestFileData[2])
         else:
             print(f'Storage {policeServer["path"]} unavailable or does not exist!')
@@ -269,9 +281,9 @@ for policeServer in secrets.servers:
 
 if dailyReport:
     email_subject = 'Суточный отчет по файлам каналов полиции.'
-    if dailyEmail_body == '':
-        dailyEmail_body = 'Проблемные каналы отсутствуют.'
-    send_email(email_subject, dailyEmail_body)
+    if daily_email_body == '':
+        daily_email_body = 'Проблемные каналы отсутствуют.'
+    send_email(email_subject, daily_email_body)
 
 print('\n Records verification completed')
 # print('\n Type ENTER for close')

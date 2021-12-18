@@ -19,7 +19,7 @@ for cred in secrets.winCredentials:
         # $password = ConvertTo-SecureString "p123456" -AsPlainText -Force
         # $Cred = New-Object System.Management.Automation.PSCredential ("domain\user1", $password)
         # ((Get-WmiObject -ComputerName "10.10.10.10" -Class Win32_ComputerSystem).UserName -split "\\")[1]
-        f'((Get-WmiObject -ComputerName "172.19.224.88" -Class Win32_ComputerSystem -Credential (New-Object System.Management.Automation.PSCredential ("{cred["user"]}", (ConvertTo-SecureString "{cred["password"]}" -AsPlainText -Force)))).UserName' + r'-split "\\")[1]'
+        f'((Get-WmiObject -ComputerName "172.18.1.126" -Class Win32_ComputerSystem -Credential (New-Object System.Management.Automation.PSCredential ("{cred["user"]}", (ConvertTo-SecureString "{cred["password"]}" -AsPlainText -Force)))).UserName' + r'-split "\\")[1]'
     )
     if logOffInfo.returncode == 0:
         if logOffInfo.stdout == b'':
