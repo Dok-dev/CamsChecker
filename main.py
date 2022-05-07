@@ -136,7 +136,7 @@ def userInSystem(host):
         logOffInfo = runPowershell(
             f'((Get-WmiObject -ComputerName "{host}" -Class Win32_ComputerSystem -Credential (New-Object System.Management.Automation.PSCredential ("{cred["user"]}", (ConvertTo-SecureString "{cred["password"]}" -AsPlainText -Force)))).UserName' + r'-split "\\")[1]'
         )
-        if logOffInfo.returncode == 0:
+        if (logOffInfo.returncode == 0) and logOffInfo.stderr == b'':
             if logOffInfo.stdout == b'':
                 print(f'{host} on is logged off.')
                 return [False, '']
@@ -210,13 +210,13 @@ for policeServer in secrets.servers:
                                     if pingGood(channel[3]):
                                         # Проверяем залогинен ли пользователь в систему
                                         logon = (userInSystem(channel[3]))
-                                        if not logon[0]:
-                                            print(f'{channel[3]} on {policeServer["name"]} is logged off.')
-                                        else:
-                                            if logon[1] != '':
-                                                email_body += f' - Ошибка при попытке проверки пользователя в системе на {channel[3]} ({policeServer["name"]}) - {logon[1]}'
+                                        if logon[1] != '':
+                                            email_body += f' - Ошибка при попытке проверки пользователя в системе на {channel[3]} ({policeServer["name"]}): \n\{logon[1]}'
                                             send_email(email_subject, email_body)
                                             print(time.ctime(NewestFileTimeInChanel), ' ', FilesPath, '      ', round(FileSize / (1024 * 1024), 1), 'Мб')
+                                        else:
+                                            if not logon[0]:
+                                                print(f'{channel[3]} on {policeServer["name"]} is logged off.')
                                     else:
                                         email_subject = f'{channel[3]} on {policeServer["name"]} is shutdown or inaccessible.'
                                         email_body = (f'Хост {channel[3]} канала {channel[1]} на {policeServer["name"]} был выключен или стал недоступен.' +
@@ -249,7 +249,7 @@ for policeServer in secrets.servers:
                                             # Проверяем залогинен ли пользователь в систему
                                             logon = (userInSystem(channel[3]))
                                             if logon[1] != '':
-                                                daily_email_body += f'Ошибка при попытке проверки пользователя в системе на {channel[3]} ({policeServer["name"]}) - {logon[1]}'
+                                                daily_email_body += f'Ошибка при попытке проверки пользователя в системе на {channel[3]} ({policeServer["name"]}): \n\{logon[1]}'
                                             else:
                                                 if not logon[0]:
                                                     print(f'{channel[3]} on {policeServer["name"]} is logged off.')
