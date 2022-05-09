@@ -3,7 +3,7 @@ import platform
 import pymssql
 import secrets
 
-SQLServer = '172.27.68.107'
+SQLServer = '172.19.231.12'
 
 parameter = '-n' if platform.system().lower() == 'windows' else '-c'
 command = ['ping', parameter, '1', SQLServer]
@@ -18,7 +18,7 @@ else:
 try:
     # Создаем соединение с нашей базой данных
     # В нашем примере у нас это просто файл базы
-    conn = pymssql.connect(server=server + r'\SQLEXPRESS', database='tvm_conf', user='sa', password=secrets.sqlPass)
+    conn = pymssql.connect(server=SQLServer + r'\SQLEXPRESS', database='tvm_conf', user=secrets.sqlUser, password=secrets.sqlPass)
 
     # Создаем курсор - это специальный объект который делает запросы и получает их результаты
     cursor = conn.cursor()

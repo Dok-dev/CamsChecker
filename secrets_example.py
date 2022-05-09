@@ -1,3 +1,4 @@
+sqlUser = 'reader'
 sqlPass = 'XXXXXXXX'
 
 winCredentials = [

@@ -20,7 +20,7 @@ def getChannels(SQLServer):
     """
     try:
         # Создаем соединение с нашей базой данных
-        conn = pymssql.connect(server=SQLServer + r'\SQLEXPRESS', database='tvm_conf', user='sa', password=secrets.sqlPass)
+        conn = pymssql.connect(server=SQLServer + r'\SQLEXPRESS', database='tvm_conf', user=secrets.sqlUser, password=secrets.sqlPass)
 
         # Создаем курсор - это специальный объект который делает запросы и получает их результаты
         cursor = conn.cursor()
